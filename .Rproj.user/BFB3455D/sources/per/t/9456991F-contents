@@ -1,0 +1,106 @@
+library(readxl)
+library(magrittr)
+library(dplyr)
+library(data.table)
+library(stringr)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # rstudio only
+
+########################## Variables and variable dataframes #############################
+
+## Weights
+weights_df = as.data.frame(read_excel("Einwagen.xlsx"))
+weights_df$date = as.Date(weights_df$date, format= "%Y-%m-%d")
+
+## Calculate dilution factors
+
+weights_df = subset(weights_df, date < "2023-09-29")
+
+weights_df = mutate(  weights_df
+                    , dilf_spike = EW_gesamt / EW_spike
+                    , dilf_sample = EW_gesamt / EW_sample 
+                    )
+
+source("All_data_int.R")
+
+########################## Constants #############################
+
+## concentrations element in spike
+
+spike_version_chr = "stock-solution_1 2023-09-01; working-solution_1; calibrated 2023-09-15"
+conc_Pt_spike	 =	11.43
+conc_Pd_spike  =	8.56
+conc_Re_spike	 =  7.031
+conc_Ir_spike	 =  1.59
+
+
+########################## Calculations #############################
+###### isotope ratios
+
+#### Pt
+# Spiked isotope    Pt-194
+# Reference isotope Pt-195
+
+#### Pd
+# Spiked isotope    Pd-106
+# Reference isotope Pd-105
+
+#### Re
+# Spiked isotope    Re-185
+# Reference isotope Re-187
+
+#### Ir
+# Spiked isotope    Pt-191
+# Reference isotope Pt-193
+
+elements_ID_df = data.frame(
+  element = c("Pt",	"Pd",	"Re",	"Ir"),
+  ref_isotope	 = c("Pt195",	"Pd105",	"Re187",	"Ir193"),
+  spike_isotope	 = c("Pt194",	"Pd106",	"Re185",	"Ir191")
+)
+
+
+
+for(i in elements_ID_df$element) {
+  
+  print(paste(i))
+  ref_isotope = elements_ID_df[elements_ID_df$element == i,"ref_isotope"]
+  print(class(ref_isotope))
+  spike_isotope = elements_ID_df[elements_ID_df$element == i,"spike_isotope"]
+  
+  
+  results_int_ms = results_int_ms %>%
+    rowwise() %>%
+    mutate(sum_of_int = sum(c_across(starts_with(as.character(paste(i))))),
+           abd_ref = c_across(all_of(ref_isotope)) * 100 / sum_of_int ,
+           abd_spike = c_across(all_of(spike_isotope)) * 100 / sum_of_int ,
+           ratio = c_across(all_of(spike_isotope)) / c_across(all_of(ref_isotope))
+           ) %>% ungroup()
+  
+  colnames(results_int_ms)[colnames(results_int_ms) == "sum_of_int"] <- paste0("sum_int_", i)
+  colnames(results_int_ms)[colnames(results_int_ms) == "abd_ref"] <- paste0("abd_", ref_isotope)
+  colnames(results_int_ms)[colnames(results_int_ms) == "abd_spike"] <- paste0("abd_", spike_isotope)
+  colnames(results_int_ms)[colnames(results_int_ms) == "ratio"] <- paste0(spike_isotope, "/",ref_isotope)
+  
+  #abundance
+  
+  
+  # results_int_ms = sum_of_int / i
+  
+  
+  #ratio
+  
+  
+}
+
+results_int_ms$avg_natural_abd_ref =colMeans(results_int_ms[grep("^Calib_\\d", results_int_ms$id), ref_isotope ])
+results_int_ms$avg_natural_abd_spike =colMeans(results_int_ms[grep("^Calib_\\d", results_int_ms$id), spike_isotope ])
+
+results_int_ms$avg_spike_abd_ref =colMeans(results_int_ms[grep("^Spike_\\d", results_int_ms$id), ref_isotope ])
+results_int_ms$avg_spike_abd_spike =colMeans(results_int_ms[grep("^Spike_\\d", results_int_ms$id), spike_isotope ])
+# FUCK sollte technisch gesehen hirarchisch gemittelt werden... 
+
+
+
+
+
+
