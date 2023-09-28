@@ -5,12 +5,6 @@ library(data.table)
 library(stringr)
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # rstudio only
 
-########################## Constants #############################
-
-## concentrations element in spike
-
-spike_version_chr = "stock-solution_1 2023-09-01; working-solution_1; calibrated 2023-09-15"
-
 ########################## Variables and variable dataframes #############################
 
 ## Weights
@@ -29,21 +23,21 @@ weights_df = mutate(weights_df
 
 source("All_data_int.R")
 
-# average intensities for each repeated measurement. Repeated measurements MUST be denoted "-1234"
+# average intensities for each repeated measurement
 
-unify_names_f = function(x){
-  x = gsub("\\-\\d$","", x)
-  
-  return(x)
-}
+# results_int_ms$avg_spike_abd_ref = colMeans(
+#   results_int_ms[grep("^Spike_\\d"
+#                       , results_int_ms$id), "abd_ref"])
 
-results_int_ms$id = unify_names_f(results_int_ms$id)
+########################## Constants #############################
 
-results_int_ms %>%
-  group_by(id) %>%
-  summarise_all(mean) %>%
-  data.frame() -> results_int_ms
+## concentrations element in spike
 
+spike_version_chr = "stock-solution_1 2023-09-01; working-solution_1; calibrated 2023-09-15"
+conc_Pt_spike	 =	11.43
+conc_Pd_spike  =	8.56
+conc_Re_spike	 =  7.031
+conc_Ir_spike	 =  1.59
 
 
 ########################## Calculations #############################
@@ -68,11 +62,8 @@ results_int_ms %>%
 elements_ID_df = data.frame(
   element = c("Pt",	"Pd",	"Re",	"Ir"),
   ref_isotope	 = c("Pt195",	"Pd105",	"Re187",	"Ir193"),
-  spike_isotope	 = c("Pt194",	"Pd106",	"Re185",	"Ir191"),
-  concentration = c(11.43, 8.56, 7.031, 1.59)
+  spike_isotope	 = c("Pt194",	"Pd106",	"Re185",	"Ir191")
 )
-
-
 
 try(drop(results_conc_ID))
 results_conc_ID = select(results_int_ms, id)
@@ -82,18 +73,17 @@ for (i in elements_ID_df$element) {
   #set respective isotopes for active element(i)
   ref_isotope = elements_ID_df[elements_ID_df$element == i, "ref_isotope"]
   spike_isotope = elements_ID_df[elements_ID_df$element == i, "spike_isotope"]
-  conc_element = elements_ID_df[elements_ID_df$element == i, "concentration"]
   
   ## calculate abundances of respecive isotopes
   # calculate the sum of all intensities per element(i)
   results_int_ms = results_int_ms %>%
     rowwise() %>%
-    dplyr::mutate(
+    mutate(
       sum_of_int = sum( c_across( starts_with(
-                                              as.character(paste(i))
-                                              )
-                                  ),
-                        na.rm = T), 
+        as.character(paste(i))
+      )
+      ),
+      na.rm = T), 
       # calculate abundance of respective isotopes
       abd_ref = c_across(all_of(ref_isotope)) / sum_of_int ,
       abd_spike = c_across(all_of(spike_isotope)) / sum_of_int ,
@@ -102,23 +92,25 @@ for (i in elements_ID_df$element) {
   print("###########################################################")
   print(colnames(results_int_ms))
   print(results_int_ms$abd_ref)
-
+  
   # average of the natural abundance, averaged from all measurements denoted "calib" followed by a number,
   # i.e. the "normal" calibration standard
   results_int_ms$avg_natural_abd_ref = colMeans(results_int_ms[grep("^Calib_\\d", results_int_ms$id), "abd_ref"])
   results_int_ms$avg_natural_abd_spike = colMeans(results_int_ms[grep("^Calib_\\d", results_int_ms$id), "abd_spike"])
-
+  
   # average of the isotope abundance in the spike, averaged from all measurements denoted "spike" followed by a number
   results_int_ms$avg_spike_abd_ref = colMeans(results_int_ms[grep("^Spike_\\d", results_int_ms$id), "abd_ref"])
   results_int_ms$avg_spike_abd_spike = colMeans(results_int_ms[grep("^Spike_\\d", results_int_ms$id), "abd_spike"])
   # FUCK sollte technisch gesehen hirarchisch gemittelt werden...
-
+  
   results_int_ms = results_int_ms %>%
     rowwise() %>%
-    mutate(conc = conc_element * (avg_spike_abd_spike - (ratio * avg_spike_abd_ref)) / (( ratio * avg_natural_abd_ref) - avg_natural_abd_spike )
-           )
-
+    mutate(conc = (avg_spike_abd_spike - (ratio * avg_spike_abd_ref)) / (( ratio * avg_natural_abd_ref) - avg_natural_abd_spike )
+    )
+  
   results_conc_ID[[i]] = results_int_ms$conc
+  # As-RbBs
+  # Rb*Bx-Ax
   
   names(results_int_ms)[names(results_int_ms) == 'sum_of_int'] <- paste0('sum_of_int_', i)
   names(results_int_ms)[names(results_int_ms) == 'abd_ref'] <- paste0('abd_ref_', ref_isotope)
@@ -128,10 +120,13 @@ for (i in elements_ID_df$element) {
   names(results_int_ms)[names(results_int_ms) == 'avg_natural_abd_spike'] <- paste0('avg_natural_abd_', spike_isotope)
   names(results_int_ms)[names(results_int_ms) == 'avg_spike_abd_ref'] <- paste0('avg_spike_abd_', ref_isotope)
   names(results_int_ms)[names(results_int_ms) == 'avg_spike_abd_spike'] <- paste0('avg_spike_abd_spike_', spike_isotope)
- 
+  
+  
+  
+  
   
 }  
-  
+
 results_int_ms = results_int_ms[, -which(names(results_int_ms) %in% c(  "Ru100"
                                                                         , "Ru101"
                                                                         , "Ru102"
@@ -148,37 +143,8 @@ results_int_ms = results_int_ms[, -which(names(results_int_ms) %in% c(  "Ru100"
                                                                         , "Cd111"
 ))]
 
+# test = results_conc_ID[grep("^Calib_Spike_\\d", results_int_ms$id),]
 
-results_conc_ID = merge(results_conc_ID, weights_df, by.x = "id", by.y = "id", incomparables = "NAN") 
-
-# step 1: resolve every dilution individually
-
-results_conc = select(results_conc_ID, id)
-
-for(j in elements_ID_df$element){
-  
-  results_conc[j] = results_conc_ID[j] * results_conc_ID$dilf_sample / results_conc_ID$dilf_spike
-  
-}
-
-  
-combine_replicates_f = function(x){
-  x = gsub("\\_\\d$","", x)
-  x = gsub("\\s\\d$","", x)
-  
-  return(x)
-}
-
-# step 2: now calculate the mean for a sample across all dilutions. Separate dilutions MUST be denoted "_1234"
-
-results_conc$id = combine_replicates_f(results_conc$id)
-
-results_conc %>%
-  dplyr::group_by(id) %>%
-  dplyr::summarise(mean = across(c(Pt, Pd, Re, Ir), mean),
-                   sd = across(c(Pt, Pd, Re, Ir), sd),) -> results_conc
-
-View(results_conc)
-
-
+View(test)
+View(results_conc_ID)
 
