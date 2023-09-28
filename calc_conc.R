@@ -23,6 +23,12 @@ weights_df = mutate(weights_df
 
 source("All_data_int.R")
 
+# average intensities for each repeated measurement
+
+# results_int_ms$avg_spike_abd_ref = colMeans(
+#   results_int_ms[grep("^Spike_\\d"
+#                       , results_int_ms$id), "abd_ref"])
+
 ########################## Constants #############################
 
 ## concentrations element in spike
