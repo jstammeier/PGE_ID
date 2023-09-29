@@ -55,14 +55,20 @@ read_file <- function(fn) {
   #                                 , rawdata[, "Intensity.AVG"])
   # 
 ####### (4) only keep column Isotope & Intensity.AVG ######
- 
-   # use intereference corrected intensities
+
+    # use intereference corrected intensities
   rawdata_reduced_notime_int <- select(rawdata, "Isotope", "IF.cor.AVG")
  
   
   
   nm <- sub(".*/", "", fn, perl = TRUE)
   nm <- sub(".ASC", "", nm)
+  print("-------------------------------------------------------")
+  print(names(rawdata_reduced_notime_int))
+  
+  
+  
+  
   names(rawdata_reduced_notime_int)[names(rawdata_reduced_notime_int) == "IF.cor.AVG"] <- nm
   ## add time stamp ####
   asc_to_dat = sub(".ASC", ".dat", fn)
@@ -82,6 +88,7 @@ transpose_list <- function(l) {
   row_names = sub("\\(LR\\)", "", row_names)
   
   id <- colnames(l)[[2]]
+
   
   transposed <- as.data.frame(t(l[, -1]))
   colnames(transposed) <- row_names
